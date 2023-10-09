@@ -17,8 +17,6 @@ const interval = 1000 / 60;
 (function draw(currentTime: number) {
   const delta = currentTime - previousTime;
 
-  time +=delta
-
   if (delta >= interval) {
     previousTime = currentTime - (delta % interval);
 

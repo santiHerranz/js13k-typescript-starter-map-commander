@@ -5,112 +5,131 @@ import { Vector } from "./vector";
 
 class InputMouse {
 
-  public lastX: number = 0;
-  public lastY: number = 0;
-
   public pointer: Pointer = new Pointer();
-  public scale = 1
 
-  public eventMouseDown = () => { }  // for binding
-  public eventMouseMove = () => { }  // for binding
-  public eventMouseUp = () => { }    // for binding
-  public eventMouseScroll = (scale: number) => { } // for binding
-  public eventContextmenu = () => { } // for binding
+  public info = { scale: 1 }
 
   constructor() {
 
     const canvas = document.getElementById('c2d')
 
     if (canvas) {
-      canvas.addEventListener('mousedown', this.handleMouseDown, false);
-      canvas.addEventListener('mousemove', this.handleMouseMove, false);
-      canvas.addEventListener('mouseup', this.handleMouseUp, false);
-      canvas.addEventListener('DOMMouseScroll', this.handleScroll, false);
-      canvas.addEventListener('mousewheel', this.handleScroll, false); // chrome    
-      canvas.addEventListener("contextmenu", this.handleContextmenu, false);
-
+      canvas.addEventListener('mousedown', onMouseDown);
+      canvas.addEventListener('mousemove', onMouseMove);
+      canvas.addEventListener('mouseup', onMouseUp);
+      canvas.addEventListener('wheel', onWheel);
     }
 
   }
+  
 
-  private getMousePosition = (evt: any) => {
+  setMousePosition = (clientX: number, clientY: number) => {
 
-    var rect = c2d.getBoundingClientRect();
 
-    this.lastX = (evt.clientX - rect.left) / c2d.offsetWidth * 1920
-    this.lastY = (evt.clientY - rect.top) / (c2d.offsetWidth / (1920 / 1080)) * 1080
+    let x = (clientX) / c2d.offsetWidth * 1920
+    let y = (clientY) / (c2d.offsetWidth / (1920 / 1080)) * 1080
 
-    this.pointer.Position = new Vector(this.lastX, this.lastY)
+    this.pointer.Position = new Vector(x, y)
   }
 
+}
 
 
-  handleMouseDown = (evt: any) => {
+let isDragging = false;
+let dragStartPosition = { x: 0, y: 0 };
+let currentTransformedCursor: DOMPoint;
+let mouseZoomValue = 1;
+let transformedCursorValue = 0
 
-    if (!e) var e: Event | any = window.event;
 
-    if (e.which) this.pointer.leftButton = (e.which == 1);
-    else if (e.button) this.pointer.leftButton = (e.button == 0);
 
-    if (e.which) this.pointer.middleButton = (e.which == 2);
-    else if (e.button) this.pointer.middleButton = (e.button == 1);
+function drawImageToCanvas(context: CanvasRenderingContext2D) {
+  context.save();
+  context.setTransform(1, 0, 0, 1, 0, 0);
+  context.clearRect(0, 0, 1920, 1080);
+  context.restore();
 
-    if (e.which) this.pointer.rigthButton = (e.which == 3);
-    else if (e.button) this.pointer.rigthButton = (e.button == 1);
+  // context.drawImage(image, 0, 0, 1072, 603);
+}
 
-    this.getMousePosition(evt)
+// function getTransformedPoint( x: number | undefined, y: number | undefined) {
+//   let context = drawEngine.context
+//   const originalPoint = new DOMPoint(x, y);
+//   return context.getTransform().invertSelf().transformPoint(originalPoint);
+// }
 
-    this.pointer.Position = new Vector(this.lastX, this.lastY)
+function getTransformedPoint(x: number, y: number) {
+  const originalPoint = new DOMPoint(x, y);
+  // adjust for canvas scaling
+  const xScaleFactor = drawEngine.context.canvas.width / drawEngine.context.canvas.clientWidth;
+  const yScaleFactor = drawEngine.context.canvas.height / drawEngine.context.canvas.clientHeight;
+  originalPoint.x *= xScaleFactor;
+  originalPoint.y *= yScaleFactor;
 
-    this.eventMouseDown();
+  return drawEngine.context.getTransform().invertSelf().transformPoint(originalPoint);
+}
+
+function onMouseDown(event: { offsetX: number; offsetY: number; }) {
+
+  inputMouse.setMousePosition(event.offsetX, event.offsetY)
+
+  isDragging = true;
+  dragStartPosition = getTransformedPoint(event.offsetX, event.offsetY);
+}
+
+function onMouseMove(event: { offsetX: number; offsetY: number; }) {
+
+  inputMouse.setMousePosition(event.offsetX, event.offsetY)
+
+  let context = drawEngine.context
+
+  currentTransformedCursor = getTransformedPoint(event.offsetX, event.offsetY);
+
+
+  // mousePos.innerText = `Original X: ${event.offsetX}, Y: ${event.offsetY}`;
+  // transformedMousePos.innerText = `Transformed X: ${currentTransformedCursor.x.toFixed(1)}, Y: ${currentTransformedCursor.y.toFixed(1)}`;
+
+  if (isDragging) {
+
+    // if (transformedCursorValue + currentTransformedCursor.x - dragStartPosition.x > 0) return
+
+    transformedCursorValue += currentTransformedCursor.x - dragStartPosition.x
+
+    // transformedCursor.innerText = `Delta X: ${transformedCursorValue.toFixed(1)}`;
+
+    context.translate(currentTransformedCursor.x - dragStartPosition.x, currentTransformedCursor.y - dragStartPosition.y);
+    drawImageToCanvas(context);
   }
+}
 
-  handleMouseMove = (evt: any) => {
-
-    this.getMousePosition(evt)
-
-    this.eventMouseMove();
-
-
-    return evt.preventDefault() && false;
-  }
-
-  handleMouseUp = (evt: any) => {
-
-    this.getMousePosition(evt)
-
-    if (!e) var e: Event | any = window.event;
-
-    this.pointer.leftButton = false;
-    this.pointer.middleButton = false;
-    this.pointer.rigthButton = false;
-
-    this.eventMouseUp();
-
-    return evt.preventDefault() && false;
-  }
-
-  handleContextmenu = (evt: any) => {
-    this.eventContextmenu();
-    return evt.preventDefault() && false;
-  }
-
-  handleScroll = (evt: any) => {
-    evt.preventDefault()
-
-    // console.log('evt: '+ JSON.stringify(evt));
-
-    var delta = (evt.wheelDelta ? evt.wheelDelta : -evt.deltaY);
-
-    (delta > 0) ? (this.scale /= 1.15) : (this.scale *= 1.15);
-
-    this.scale = Math.min(this.scale, 1.5)
-    this.scale = Math.max(this.scale, 0.05)
-
-    this.eventMouseScroll(this.scale);
-  };
+function onMouseUp() {
+  isDragging = false;
+}
 
 
+function onWheel(event: { deltaY: number; preventDefault: () => void; }) {
+
+  let context = drawEngine.context
+
+  const zoom = event.deltaY < 0 ? 1.1 : 0.9;
+
+
+  mouseZoomValue *= zoom
+
+  if (mouseZoomValue * zoom < 1) return
+  if (mouseZoomValue * zoom > 6) return
+
+
+  inputMouse.info.scale = mouseZoomValue
+
+  // mouseZoom.innerText = `zoom: ${mouseZoomValue.toFixed(3)}`;
+
+  context.translate(currentTransformedCursor.x, currentTransformedCursor.y);
+  context.scale(zoom, zoom);
+  context.translate(-currentTransformedCursor.x, -currentTransformedCursor.y);
+
+  drawImageToCanvas(context);
+  event.preventDefault();
 }
 
 export const inputMouse = new InputMouse();
