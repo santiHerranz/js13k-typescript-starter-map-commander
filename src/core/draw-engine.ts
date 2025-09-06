@@ -8,6 +8,15 @@ class DrawEngine {
   constructor() {
     this.context = c2d.getContext('2d');
     this._storedTransform = this.context.getTransform();
+    // Disable smoothing to reduce shimmering/flicker on scaled content
+    this.context.imageSmoothingEnabled = false;
+    // Lower quality to be explicit; has effect on some browsers
+    // Note: UI text remains crisp because it's drawn at identity transform
+    // and not affected by image smoothing settings for drawImage.
+    // This also keeps pixel-art look for the map image.
+    // If you need smoothing, set to true and adjust pan rounding.
+    // @ts-ignore - some engines may not support this property
+    this.context.imageSmoothingQuality = 'low';
   }
 
   get canvasWidth() {
